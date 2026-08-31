@@ -14,10 +14,6 @@ const io = new Server(server, {
   transports: ["websocket", "polling"]
 });
 
-// ===============================
-// CONFIG
-// ===============================
-
 const PORT = process.env.PORT || 3000;
 
 const MAX_NAME_LENGTH = 24;
@@ -25,30 +21,22 @@ const MAX_CHANNEL_LENGTH = 10;
 
 const users = new Map();
 
-// ===============================
-// STATIC WEBSITE
-// ===============================
-
 app.use(express.static(path.join(__dirname)));
 
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    service: "NET-RADIO",
+    users: users.size
+  });
 });
 
-// ===============================
-// HELPER
-// ===============================
-
 function cleanName(name) {
-  if (typeof name !== "string") {
-    return "GUEST";
-  }
+  if (typeof name !== "string") return "GUEST";
 
   name = name.trim();
 
-  if (!name) {
-    return "GUEST";
-  }
+  if (!name) return "GUEST";
 
   return name
     .replace(/[<>]/g, "")
@@ -80,7 +68,8 @@ function getChannelUsers(channel) {
     if (user.channel === channel) {
       result.push({
         id,
-        name: user.name
+        name: user.name,
+        transmitting: user.transmitting
       });
     }
   }
@@ -96,12 +85,7 @@ function sendUserCount(channel) {
   });
 }
 
-// ===============================
-// SOCKET.IO
-// ===============================
-
 io.on("connection", (socket) => {
-
   console.log("CONNECTED:", socket.id);
 
   users.set(socket.id, {
@@ -110,26 +94,14 @@ io.on("connection", (socket) => {
     transmitting: false
   });
 
-  // -----------------------------
-  // SET NAME
-  // -----------------------------
-
   socket.on("set-name", (name) => {
-
     const user = users.get(socket.id);
 
     if (!user) return;
 
-    const oldName = user.name;
-
     user.name = cleanName(name);
 
-    console.log(
-      `[NAME] ${socket.id}: ${oldName} -> ${user.name}`
-    );
-
     if (user.channel) {
-
       socket.to(user.channel).emit("peer-renamed", {
         id: socket.id,
         name: user.name
@@ -137,12 +109,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // -----------------------------
-  // JOIN CHANNEL
-  // -----------------------------
-
   socket.on("join-channel", (channel) => {
-
     const user = users.get(socket.id);
 
     if (!user) return;
@@ -151,14 +118,9 @@ io.on("connection", (socket) => {
 
     const oldChannel = user.channel;
 
-    // Already here
-    if (oldChannel === channel) {
-      return;
-    }
+    if (oldChannel === channel) return;
 
-    // Leave old channel
     if (oldChannel) {
-
       socket.to(oldChannel).emit("peer-left", {
         id: socket.id
       });
@@ -168,23 +130,18 @@ io.on("connection", (socket) => {
       sendUserCount(oldChannel);
     }
 
-    // Update user
     user.channel = channel;
     user.transmitting = false;
 
-    // Join new channel
     socket.join(channel);
 
-    // Get current users BEFORE adding this user
     const peers = getChannelUsers(channel)
       .filter(p => p.id !== socket.id);
 
-    // Tell new user about existing users
     socket.emit("peer-list", {
       peers
     });
 
-    // Tell existing users about new user
     socket.to(channel).emit("peer-joined", {
       id: socket.id,
       name: user.name
@@ -197,17 +154,10 @@ io.on("connection", (socket) => {
     );
   });
 
-  // -----------------------------
-  // LEAVE CHANNEL
-  // -----------------------------
-
   socket.on("leave-channel", () => {
-
     const user = users.get(socket.id);
 
-    if (!user || !user.channel) {
-      return;
-    }
+    if (!user || !user.channel) return;
 
     const channel = user.channel;
 
@@ -227,61 +177,38 @@ io.on("connection", (socket) => {
     );
   });
 
-  // -----------------------------
-  // TRANSMIT STATE
-  // -----------------------------
-
   socket.on("transmit-state", (transmitting) => {
-
     const user = users.get(socket.id);
 
-    if (!user || !user.channel) {
-      return;
-    }
+    if (!user || !user.channel) return;
 
     user.transmitting = Boolean(transmitting);
 
-    socket.to(user.channel).emit("peer-transmit-state", {
-      id: socket.id,
-      transmitting: user.transmitting
-    });
+    socket.to(user.channel).emit(
+      "peer-transmit-state",
+      {
+        id: socket.id,
+        transmitting: user.transmitting
+      }
+    );
   });
 
-  // -----------------------------
-  // WEBRTC SIGNAL
-  // -----------------------------
-
   socket.on("webrtc-signal", (data) => {
-
     const user = users.get(socket.id);
 
-    if (!user || !user.channel) {
-      return;
-    }
+    if (!user || !user.channel) return;
 
-    if (!data || typeof data !== "object") {
-      return;
-    }
+    if (!data || typeof data !== "object") return;
 
     const targetId = data.to;
 
-    if (typeof targetId !== "string") {
-      return;
-    }
+    if (typeof targetId !== "string") return;
 
     const target = users.get(targetId);
 
-    if (!target) {
-      return;
-    }
+    if (!target) return;
 
-    // Security:
-    // Only allow signaling between users
-    // who are in the same radio channel.
-
-    if (target.channel !== user.channel) {
-      return;
-    }
+    if (target.channel !== user.channel) return;
 
     io.to(targetId).emit("webrtc-signal", {
       from: socket.id,
@@ -290,18 +217,11 @@ io.on("connection", (socket) => {
     });
   });
 
-  // -----------------------------
-  // DISCONNECT
-  // -----------------------------
-
   socket.on("disconnect", (reason) => {
-
     const user = users.get(socket.id);
 
     if (user) {
-
       if (user.channel) {
-
         socket.to(user.channel).emit("peer-left", {
           id: socket.id
         });
@@ -318,12 +238,7 @@ io.on("connection", (socket) => {
   });
 });
 
-// ===============================
-// SERVER
-// ===============================
-
 server.listen(PORT, "0.0.0.0", () => {
-
   console.log("--------------------------------");
   console.log(" NET-RADIO SERVER");
   console.log("--------------------------------");
