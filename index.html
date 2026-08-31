@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>NET-RADIO</title>
+
+<script src="/socket.io/socket.io.js"></script>
+
+<style>
+*{
+    box-sizing:border-box;
+    margin:0;
+    padding:0;
+}
+
+body{
+    font-family:Arial,"Noto Sans Thai",sans-serif;
+    background:
+        radial-gradient(circle at top,#19334d 0%,#07111c 45%,#02060a 100%);
+    color:#fff;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:20px;
+}
+
+.radio{
+    width:100%;
+    max-width:520px;
+    background:rgba(10,20,30,.94);
+    border:1px solid rgba(0,200,255,.35);
+    border-radius:28px;
+    padding:24px;
+    box-shadow:
+        0 0 40px rgba(0,180,255,.12),
+        inset 0 0 30px rgba(0,180,255,.04);
+}
+
+.header{
+    text-align:center;
+    margin-bottom:20px;
+}
+
+.logo{
+    font-size:32px;
+    font-weight:900;
+    letter-spacing:4px;
+    color:#35d9ff;
+    text-shadow:0 0 15px rgba(53,217,255,.7);
+}
+
+.status{
+    margin-top:7px;
+    font-size:13px;
+    color:#8ea5b5;
+}
+
+.status.online{
+    color:#52ff9a;
+}
+
+.status.offline{
+    color:#ff6868;
+}
+
+.panel{
+    background:rgba(255,255,255,.035);
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:18px;
+    padding:16px;
+    margin-top:14px;
+}
+
+label{
+    display:block;
+    font-size:13px;
+    color:#91a8b7;
+    margin-bottom:7px;
+}
+
+input,select{
+    width:100%;
+    padding:13px;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,.12);
+    background:#0b1823;
+    color:#fff;
+    outline:none;
+    font-size:15px;
+}
+
+input:focus,select:focus{
+    border-color:#2ddcff;
+    box-shadow:0 0 0 2px rgba(45,220,255,.1);
+}
+
+.row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+}
+
+button{
+    width:100%;
+    border:0;
+    border-radius:14px;
+    padding:14px;
+    margin-top:10px;
+    font-size:15px;
+    font-weight:800;
+    cursor:pointer;
+    color:white;
+    background:#123246;
+    transition:.15s;
+}
+
+button:hover{
+    transform:translateY(-1px);
+    filter:brightness(1.15);
+}
+
+button:active{
+    transform:scale(.98);
+}
+
+.connect{
+    background:linear-gradient(135deg,#008fc4,#00d9ff);
+}
+
+.disconnect{
+    background:#61252b;
+    display:none;
+}
+
+.ptt{
+    height:150px;
+    border-radius:50%;
+    width:150px;
+    margin:20px auto;
+    display:block;
+    border:5px solid rgba(255,255,255,.12);
+    background:
+        radial-gradient(circle,#16cfff 0%,#087ba5 55%,#07374b 100%);
+    box-shadow:
+        0 0 30px rgba(0,210,255,.35),
+        inset 0 0 25px rgba(0,0,0,.35);
+    font-size:18px;
+    letter-spacing:1px;
+}
+
+.ptt.active{
+    background:
+        radial-gradient(circle,#ff6a6a 0%,#c51e2e 55%,#58101a 100%);
+    box-shadow:
+        0 0 45px rgba(255,50,70,.65),
+        inset 0 0 25px rgba(0,0,0,.35);
+}
+
+.ptt:disabled{
+    opacity:.4;
+    cursor:not-allowed;
+}
+
+.radio-display{
+    text-align:center;
+    padding:20px 10px;
+}
+
+.channel{
+    font-size:42px;
+    font-weight:900;
+    letter-spacing:3px;
+    color:#fff;
+}
+
+.channel-name{
+    color:#42dfff;
+    font-size:14px;
+    margin-top:4px;
+}
+
+.signal{
+    height:35px;
+    display:flex;
+    justify-content:center;
+    align-items:end;
+    gap:4px;
+    margin-top:12px;
+}
+
+.bar{
+    width:7px;
+    border-radius:4px;
+    background:#238aaa;
+    animation:signal 1s infinite ease-in-out;
+}
+
+.bar:nth-child(1){height:8px;animation-delay:.1s}
+.bar:nth-child(2){height:14px;animation-delay:.2s}
+.bar:nth-child(3){height:21px;animation-delay:.3s}
+.bar:nth-child(4){height:28px;animation-delay:.4s}
+.bar:nth-child(5){height:35px;animation-delay:.5s}
+
+@keyframes signal{
+    0%,100%{opacity:.35;transform:scaleY(.55)}
+    50%{opacity:1;transform:scaleY(1)}
+}
+
+.users-title{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+}
+
+.count{
+    color:#35d9ff;
+    font-weight:bold;
+}
+
+.users{
+    display:flex;
+    flex-direction:column;
+    gap:7px;
+    max-height:180px;
+    overflow:auto;
+}
+
+.user{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px;
+    background:rgba(255,255,255,.045);
+    border-radius:11px;
+}
+
+.dot{
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    background:#637582;
+}
+
+.user.transmitting .dot{
+    background:#ff4558;
+    box-shadow:0 0 12px #ff4558;
+    animation:blink .7s infinite;
+}
+
+@keyframes blink{
+    50%{opacity:.3}
+}
+
+.user-name{
+    flex:1;
+    font-size:14px;
+}
+
+.talking{
+    font-size:11px;
+    color:#ff6875;
+}
+
+.log{
+    height:90px;
+    overflow:auto;
+    font-family:monospace;
+    font-size:11px;
+    color:#8299a7;
+    background:#02080d;
+    padding:10px;
+    border-radius:10px;
+}
+
+.footer{
+    text-align:center;
+    color:#536b78;
+    font-size:11px;
+    margin-top:18px;
+}
+
+@media(max-width:430px){
+    .radio{
+        padding:17px;
+        border-radius:22px;
+    }
+
+    .logo{
+        font-size:26px;
+    }
+
+    .channel{
+        font-size:34px;
+    }
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="radio">
+
+```
+<div class="header">
+    <div class="logo">NET-RADIO</div>
+    <div id="status" class="status offline">
+        ● กำลังเชื่อมต่อ...
+    </div>
+</div>
+
+<div class="panel">
+
+    <div class="row">
+
+        <div>
+            <label>ชื่อผู้ใช้</label>
+            <input
+                id="name"
+                maxlength="24"
+                placeholder="ชื่อของคุณ"
+                value="GUEST"
+            >
+        </div>
+
+        <div>
+            <label>ช่องวิทยุ</label>
+            <select id="channel">
+                <option value="ch01">CH 01</option>
+                <option value="ch02">CH 02</option>
+                <option value="ch03">CH 03</option>
+                <option value="ch04">CH 04</option>
+                <option value="ch05">CH 05</option>
+                <option value="ch06">CH 06</option>
+                <option value="ch07">CH 07</option>
+                <option value="ch08">CH 08</option>
+                <option value="ch09">CH 09</option>
+                <option value="ch10">CH 10</option>
+                <option value="ch11">CH 11</option>
+                <option value="ch12">CH 12</option>
+                <option value="ch13">CH 13</option>
+                <option value="ch14">CH 14</option>
+                <option value="ch15">CH 15</option>
+                <option value="ch16">CH 16</option>
+                <option value="ch17">CH 17</option>
+                <option value="ch18">CH 18</option>
+                <option value="ch19">CH 19</option>
+                <option value="ch20">CH 20</option>
+            </select>
+        </div>
+
+    </div>
+
+    <button id="connectBtn" class="connect">
+        📡 เข้าสู่ช่อง
+    </button>
+
+    <button id="disconnectBtn" class="disconnect">
+        ⛔ ออกจากช่อง
+    </button>
+
+</div>
+
+<div class="panel radio-display">
+
+    <div class="channel" id="channelDisplay">
+        CH 01
+    </div>
+
+    <div class="channel-name">
+        INTERNET RADIO
+    </div>
+
+    <div class="signal">
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+    </div>
+
+    <button id="ptt" class="ptt" disabled>
+        🎙️<br>
+        กดค้างเพื่อพูด
+    </button>
+
+    <div id="micStatus">
+        ไมโครโฟนยังไม่ทำงาน
+    </div>
+
+</div>
+
+<div class="panel">
+
+    <div class="users-title">
+        <b>👥 ผู้ใช้งานในช่อง</b>
+        <span id="userCount" class="count">0 คน</span>
+    </div>
+
+    <div id="users" class="users">
+        <div class="user">
+            <div class="dot"></div>
+            <div class="user-name">
+                ยังไม่มีผู้ใช้งาน
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="panel">
+
+    <label>ระบบ</label>
+
+    <div id="log" class="log"></div>
+
+</div>
+
+<div class="footer">
+    NET-RADIO • Socket.IO + WebRTC
+</div>
+```
+
+</div>
+
+<script>
+
+const socket = io({
+    transports: ["websocket", "polling"]
+});
+
+const nameInput = document.getElementById("name");
+const channelSelect = document.getElementById("channel");
+const connectBtn = document.getElementById("connectBtn");
+const disconnectBtn = document.getElementById("disconnectBtn");
+const ptt = document.getElementById("ptt");
+const statusEl = document.getElementById("status");
+const channelDisplay = document.getElementById("channelDisplay");
+const userCount = document.getElementById("userCount");
+const usersEl = document.getElementById("users");
+const logEl = document.getElementById("log");
+const micStatus = document.getElementById("micStatus");
+
+let connected = false;
+let currentChannel = null;
+
+let localStream = null;
+
+const peers = new Map();
+const peerNames = new Map();
+
+/* =========================
+   LOG
+========================= */
+
+function log(message){
+
+    const time = new Date().toLocaleTimeString();
+
+    logEl.innerHTML +=
+        `[${time}] ${escapeHTML(message)}<br>`;
+
+    logEl.scrollTop = logEl.scrollHeight;
+}
+
+function escapeHTML(text){
+
+    return String(text)
+        .replace(/&/g,"&amp;")
+        .replace(/</g,"&lt;")
+        .replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;")
+        .replace(/'/g,"&#039;");
+}
+
+/* =========================
+   SOCKET STATUS
+========================= */
+
+socket.on("connect",()=>{
+
+    statusEl.textContent = "● ออนไลน์";
+    statusEl.className = "status online";
+
+    log("เชื่อมต่อเซิร์ฟเวอร์แล้ว");
+});
+
+socket.on("disconnect",()=>{
+
+    statusEl.textContent = "● ออฟไลน์";
+    statusEl.className = "status offline";
+
+    log("หลุดจากเซิร์ฟเวอร์");
+});
+
+/* =========================
+   NAME
+========================= */
+
+nameInput.addEventListener("change",()=>{
+
+    socket.emit(
+        "set-name",
+        nameInput.value
+    );
+});
+
+/* =========================
+   CONNECT
+========================= */
+
+connectBtn.addEventListener("click",async()=>{
+
+    const name =
+        nameInput.value.trim() || "GUEST";
+
+    const channel =
+        channelSelect.value;
+
+    socket.emit("set-name",name);
+
+    socket.emit(
+        "join-channel",
+        channel
+    );
+
+    currentChannel = channel;
+    connected = true;
+
+    channelDisplay.textContent =
+        channel.toUpperCase();
+
+    connectBtn.style.display = "none";
+    disconnectBtn.style.display = "block";
+
+    ptt.disabled = false;
+
+    log(`เข้าช่อง ${channel.toUpperCase()}`);
+
+    await startMicrophone();
+});
+
+/* =========================
+   DISCONNECT
+========================= */
+
+disconnectBtn.addEventListener("click",()=>{
+
+    leaveChannel();
+});
+
+async function leaveChannel(){
+
+    if(!connected) return;
+
+    socket.emit("leave-channel");
+
+    connected = false;
+    currentChannel = null;
+
+    stopMicrophone();
+
+    for(const [id,pc] of peers){
+
+        pc.close();
+    }
+
+    peers.clear();
+    peerNames.clear();
+
+    usersEl.innerHTML = "";
+
+    connectBtn.style.display = "block";
+    disconnectBtn.style.display = "none";
+
+    ptt.disabled = true;
+    ptt.classList.remove("active");
+
+    micStatus.textContent =
+        "ไมโครโฟนยังไม่ทำงาน";
+
+    userCount.textContent = "0 คน";
+
+    channelDisplay.textContent = "CH --";
+
+    log("ออกจากช่องแล้ว");
+}
+
+/* =========================
+   USER LIST
+========================= */
+
+function addUser(id,name){
+
+    peerNames.set(id,name);
+
+    renderUsers();
+}
+
+function removeUser(id){
+
+    peerNames.delete(id);
+
+    const pc = peers.get(id);
+
+    if(pc){
+
+        pc.close();
+        peers.delete(id);
+    }
+
+    renderUsers();
+}
+
+const transmittingUsers = new Set();
+
+function renderUsers(){
+
+    usersEl.innerHTML = "";
+
+    if(peerNames.size === 0){
+
+        usersEl.innerHTML = `
+            <div class="user">
+                <div class="dot"></div>
+                <div class="user-name">
+                    ยังไม่มีผู้ใช้งานอื่น
+                </div>
+            </div>
+        `;
+
+        return;
+    }
+
+    for(const [id,name] of peerNames){
+
+        const div =
+            document.createElement("div");
+
+        div.className =
+            "user" +
+            (transmittingUsers.has(id)
+                ? " transmitting"
+                : "");
+
+        div.innerHTML = `
+            <div class="dot"></div>
+            <div class="user-name">
+                ${escapeHTML(name)}
+            </div>
+            ${
+                transmittingUsers.has(id)
+                ? `<div class="talking">กำลังพูด</div>`
+                : ""
+            }
+        `;
+
+        usersEl.appendChild(div);
+    }
+}
+
+socket.on("peer-list",(data)=>{
+
+    if(!data || !Array.isArray(data.peers))
+        return;
+
+    data.peers.forEach(peer=>{
+
+        addUser(
+            peer.id,
+            peer.name
+        );
+
+        createPeerConnection(
+            peer.id,
+            false
+        );
+    });
+
+    updateCount();
+});
+
+socket.on("peer-joined",(peer)=>{
+
+    addUser(
+        peer.id,
+        peer.name
+    );
+
+    log(`${peer.name} เข้าช่อง`);
+
+    updateCount();
+
+    /*
+      คนที่อยู่เดิมเป็นฝ่ายสร้าง offer
+    */
+
+    createPeerConnection(
+        peer.id,
+        true
+    );
+});
+
+socket.on("peer-left",(data)=>{
+
+    if(!data) return;
+
+    const name =
+        peerNames.get(data.id) || "ผู้ใช้";
+
+    removeUser(data.id);
+
+    log(`${name} ออกจากช่อง`);
+
+    updateCount();
+});
+
+socket.on("peer-renamed",(data)=>{
+
+    if(!data) return;
+
+    peerNames.set(
+        data.id,
+        data.name
+    );
+
+    renderUsers();
+});
+
+socket.on("user-count",(data)=>{
+
+    if(!data) return;
+
+    userCount.textContent =
+        `${data.count} คน`;
+});
+
+function updateCount(){
+
+    userCount.textContent =
+        `${peerNames.size + (connected ? 1 : 0)} คน`;
+}
+
+/* =========================
+   WEBRTC
+========================= */
+
+function createPeerConnection(
+    peerId,
+    createOffer
+){
+
+    if(peers.has(peerId))
+        return peers.get(peerId);
+
+    const pc =
+        new RTCPeerConnection({
+            iceServers:[
+                {
+                    urls:
+                    "stun:stun.l.google.com:19302"
+                },
+                {
+                    urls:
+                    "stun:stun1.l.google.com:19302"
+                }
+            ]
+        });
+
+    peers.set(peerId,pc);
+
+    if(localStream){
+
+        localStream
+            .getTracks()
+            .forEach(track=>{
+
+                pc.addTrack(
+                    track,
+                    localStream
+                );
+            });
+    }
+
+    pc.onicecandidate = event=>{
+
+        if(!event.candidate)
+            return;
+
+        sendSignal(
+            peerId,
+            "candidate",
+            event.candidate
+        );
+    };
+
+    pc.ontrack = event=>{
+
+        const stream =
+            event.streams[0];
+
+        if(!stream)
+            return;
+
+        playRemoteAudio(
+            peerId,
+            stream
+        );
+    };
+
+    pc.onconnectionstatechange = ()=>{
+
+        log(
+            `${peerNames.get(peerId) || "PEER"} : ${pc.connectionState}`
+        );
+
+        if(
+            pc.connectionState === "failed" ||
+            pc.connectionState === "closed"
+        ){
+
+            peers.delete(peerId);
+        }
+    };
+
+    if(createOffer){
+
+        pc.createOffer()
+            .then(offer=>pc.setLocalDescription(offer))
+            .then(()=>{
+
+                sendSignal(
+                    peerId,
+                    "offer",
+                    pc.localDescription
+                );
+            })
+            .catch(err=>{
+                log("WebRTC offer error");
+                console.error(err);
+            });
+    }
+
+    return pc;
+}
+
+function sendSignal(
+    peerId,
+    type,
+    payload
+){
+
+    socket.emit(
+        "webrtc-signal",
+        {
+            to: peerId,
+            type,
+            payload
+        }
+    );
+}
+
+socket.on("webrtc-signal",async(data)=>{
+
+    if(!data || !data.from)
+        return;
+
+    let pc =
+        peers.get(data.from);
+
+    if(!pc){
+
+        pc =
+            createPeerConnection(
+                data.from,
+                false
+            );
+    }
+
+    try{
+
+        if(data.type === "offer"){
+
+            await pc.setRemoteDescription(
+                new RTCSessionDescription(
+                    data.payload
+                )
+            );
+
+            const answer =
+                await pc.createAnswer();
+
+            await pc.setLocalDescription(
+                answer
+            );
+
+            sendSignal(
+                data.from,
+                "answer",
+                pc.localDescription
+            );
+        }
+
+        else if(data.type === "answer"){
+
+            await pc.setRemoteDescription(
+                new RTCSessionDescription(
+                    data.payload
+                )
+            );
+        }
+
+        else if(data.type === "candidate"){
+
+            if(data.payload){
+
+                await pc.addIceCandidate(
+                    new RTCIceCandidate(
+                        data.payload
+                    )
+                );
+            }
+        }
+
+    }catch(error){
+
+        console.error(
+            "WebRTC signal error:",
+            error
+        );
+    }
+});
+
+/* =========================
+   REMOTE AUDIO
+========================= */
+
+const remoteAudios = new Map();
+
+function playRemoteAudio(
+    peerId,
+    stream
+){
+
+    let audio =
+        remoteAudios.get(peerId);
+
+    if(!audio){
+
+        audio =
+            document.createElement("audio");
+
+        audio.autoplay = true;
+        audio.playsInline = true;
+
+        audio.style.display = "none";
+
+        document.body.appendChild(audio);
+
+        remoteAudios.set(
+            peerId,
+            audio
+        );
+    }
+
+    audio.srcObject = stream;
+
+    audio.play()
+        .catch(()=>{
+            log(
+                "เบราว์เซอร์รอการอนุญาตเล่นเสียง"
+            );
+        });
+}
+
+/* =========================
+   MICROPHONE
+========================= */
+
+async function startMicrophone(){
+
+    if(localStream)
+        return;
+
+    try{
+
+        localStream =
+            await navigator.mediaDevices.getUserMedia({
+                audio:{
+                    echoCancellation:true,
+                    noiseSuppression:true,
+                    autoGainControl:true
+                },
+                video:false
+            });
+
+        localStream
+            .getAudioTracks()
+            .forEach(track=>{
+                track.enabled = false;
+            });
+
+        micStatus.textContent =
+            "🎙️ ไมโครโฟนพร้อมใช้งาน";
+
+        log("เปิดไมโครโฟนแล้ว");
+
+        /*
+          ถ้ามี peer อยู่แล้ว
+          เพิ่ม track เข้า connection
+        */
+
+        for(const [id,pc] of peers){
+
+            localStream
+                .getTracks()
+                .forEach(track=>{
+
+                    const senders =
+                        pc.getSenders();
+
+                    const exists =
+                        senders.some(
+                            sender =>
+                            sender.track === track
+                        );
+
+                    if(!exists){
+
+                        pc.addTrack(
+                            track,
+                            localStream
+                        );
+                    }
+                });
+        }
+
+    }catch(error){
+
+        console.error(error);
+
+        micStatus.textContent =
+            "❌ ไม่สามารถใช้ไมโครโฟนได้";
+
+        log(
+            "ไม่สามารถเข้าถึงไมโครโฟน"
+        );
+    }
+}
+
+function stopMicrophone(){
+
+    if(!localStream)
+        return;
+
+    localStream
+        .getTracks()
+        .forEach(track=>{
+            track.stop();
+        });
+
+    localStream = null;
+}
+
+/* =========================
+   PUSH TO TALK
+========================= */
+
+async function startTalking(){
+
+    if(!connected)
+        return;
+
+    if(!localStream){
+
+        await startMicrophone();
+    }
+
+    if(!localStream)
+        return;
+
+    localStream
+        .getAudioTracks()
+        .forEach(track=>{
+            track.enabled = true;
+        });
+
+    ptt.classList.add("active");
+
+    ptt.innerHTML =
+        "🔴<br>กำลังพูด";
+
+    micStatus.textContent =
+        "🔴 กำลังส่งเสียง";
+
+    socket.emit(
+        "transmit-state",
+        true
+    );
+}
+
+function stopTalking(){
+
+    if(!localStream)
+        return;
+
+    localStream
+        .getAudioTracks()
+        .forEach(track=>{
+            track.enabled = false;
+        });
+
+    ptt.classList.remove("active");
+
+    ptt.innerHTML =
+        "🎙️<br>กดค้างเพื่อพูด";
+
+    micStatus.textContent =
+        "🎙️ ไมโครโฟนพร้อมใช้งาน";
+
+    socket.emit(
+        "transmit-state",
+        false
+    );
+}
+
+/* Mouse */
+
+ptt.addEventListener(
+    "mousedown",
+    startTalking
+);
+
+ptt.addEventListener(
+    "mouseup",
+    stopTalking
+);
+
+ptt.addEventListener(
+    "mouseleave",
+    stopTalking
+);
+
+/* Touch */
+
+ptt.addEventListener(
+    "touchstart",
+    event=>{
+        event.preventDefault();
+        startTalking();
+    },
+    {passive:false}
+);
+
+ptt.addEventListener(
+    "touchend",
+    event=>{
+        event.preventDefault();
+        stopTalking();
+    },
+    {passive:false}
+);
+
+ptt.addEventListener(
+    "touchcancel",
+    stopTalking
+);
+
+/* =========================
+   TRANSMIT STATE
+========================= */
+
+socket.on(
+    "peer-transmit-state",
+    data=>{
+
+        if(!data)
+            return;
+
+        if(data.transmitting){
+
+            transmittingUsers.add(
+                data.id
+            );
+
+        }else{
+
+            transmittingUsers.delete(
+                data.id
+            );
+        }
+
+        renderUsers();
+    }
+);
+
+/* =========================
+   CHANNEL CHANGE
+========================= */
+
+channelSelect.addEventListener(
+    "change",
+    ()=>{
+
+        if(!connected)
+            return;
+
+        /*
+          เปลี่ยนช่องทันที
+        */
+
+        socket.emit(
+            "join-channel",
+            channelSelect.value
+        );
+
+        currentChannel =
+            channelSelect.value;
+
+        channelDisplay.textContent =
+            currentChannel.toUpperCase();
+
+        peerNames.clear();
+        transmittingUsers.clear();
+
+        for(const [id,pc] of peers){
+
+            pc.close();
+        }
+
+        peers.clear();
+
+        renderUsers();
+
+        log(
+            `เปลี่ยนเป็น ${currentChannel.toUpperCase()}`
+        );
+    }
+);
+
+/* =========================
+   PAGE CLOSE
+========================= */
+
+window.addEventListener(
+    "beforeunload",
+    ()=>{
+        socket.emit(
+            "leave-channel"
+        );
+    }
+);
+
+/* =========================
+   START
+========================= */
+
+log("NET-RADIO พร้อมใช้งาน");
+
+</script>
+
+</body>
+</html>
